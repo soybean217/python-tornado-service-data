@@ -22,8 +22,8 @@ class MainHandler(tornado.web.RequestHandler):
 class SmsHandler(tornado.web.RequestHandler):
     def get(self,sms):
         self.write("ok")
-        print 
-        _sms = {'spnumber':self.get_argument('spnumber'),'mobile':self.get_argument('mobile'),'linkid':self.get_argument('linkid'),'msg':self.get_argument('msg'),'status':self.get_argument('status'),'other1':self.get_argument('PHGH1')} 
+        print sms
+        _sms = {'spnumber':self.get_argument('spnumber'),'mobile':self.get_argument('mobile'),'linkid':self.get_argument('linkid'),'msg':self.get_argument('msg'),'status':self.get_argument('status')} 
 
 class IvrHandler(tornado.web.RequestHandler):
     def get(self):
@@ -40,9 +40,6 @@ def make_app():
         (r"/ivr/([0-9a-zA-Z\-\_]+)", IvrHandler),
         (r"/month/([0-9a-zA-Z\-\_]+)", MonthHandler),
     ])
-
-def sms():
-
 
 if __name__ == "__main__":
     print "begin..."
