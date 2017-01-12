@@ -83,8 +83,6 @@ def update_user_by_fee_info(_sms_cmd,_user) :
     if _user['lastFeeTime'] <= 0 :
         _is_same_month = False
     else:
-        print(time.strftime("%Y-%m", time.localtime(_time_current)))
-        print(time.strftime("%Y-%m", time.localtime(_user['lastFeeTime'])))
         if time.strftime("%Y-%m", time.localtime(_time_current)) == time.strftime("%Y-%m", time.localtime(_user['lastFeeTime'])) :
             _is_same_month = True
         else:
