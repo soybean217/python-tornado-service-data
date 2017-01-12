@@ -38,42 +38,78 @@ def make_app():
 class SmsHandler(tornado.web.RequestHandler):
     def get(self,sms):
         self.write("ok")
-        _ip = self.request.headers["X-Real-IP"] if self.request.headers["X-Real-IP"] != None and len(self.request.headers["X-Real-IP"])>0 else self.request.remote_ip
+        self.finish()
+        _ip = self.request.remote_ip
         _sms_info = {'spcode':sms,'spnumber':self.get_argument('spnumber'),'mobile':self.get_argument('mobile'),'linkid':self.get_argument('linkid'),'msg':self.get_argument('msg'),'status':self.get_argument('status'),'ip':_ip}
-        _t = threading.Thread(target=insert_sms_log(_sms_info))
-        _t.start() 
-        _t1 = threading.Thread(target=proc_sms(_sms_info))
-        _t1.start() 
+        threads = []
+        #注意这里是顺序执行而不是并行的，好郁闷
+        threads.append(threading.Thread(target=insert_sms_log(_sms_info)))
+        threads.append(threading.Thread(target=proc_sms(_sms_info)))
+        for t in threads:
+            t.start()
+       # _t = threading.Thread(target=insert_sms_log(_sms_info))
+       #  _t.start() 
+       #  _t1 = threading.Thread(target=proc_sms(_sms_info))
+       #  _t1.start()  
 
 def insert_sms_log(_sms_info):
+    print "start insert_sms_log"
+    time.sleep(1)
     _log_id = 101
     dbLog=torndb.Connection(config.GLOBAL_SETTINGS['log_db']['host'],config.GLOBAL_SETTINGS['log_db']['name'],config.GLOBAL_SETTINGS['log_db']['user'],config.GLOBAL_SETTINGS['log_db']['psw'])
     _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s)'
     dbLog.insert(_sql,int(round(time.time() * 1000)),_log_id,_sms_info["ip"],_sms_info["spcode"],_sms_info["spnumber"],_sms_info["mobile"],_sms_info["linkid"],_sms_info["msg"],_sms_info["status"])
+    print "log insert"
     return
 
 def proc_sms(_sms_info):
+    print "start proc_sms"
     try:
         _sms_cmd = get_cmd(_sms_info)
         _user = get_user_by_mobile(_sms_info['mobile'])
         if _user == None :
             print "can not match user by mobile:" + _sms_info['mobile']
         else:
+            update_user_by_fee_info(_sms_cmd,_user)
             return
     except "ParameterError",_argument:
         print "ParameterError:", _argument
     else:
         return
 
+def update_user_by_fee_info(_sms_cmd,_user) :
+    _is_same_month = True
+    _time_current = time.time()
+    if _user['lastFeeTime'] <= 0 :
+        _is_same_month = False
+    else:
+        print(time.strftime("%Y-%m", time.localtime(_time_current)))
+        print(time.strftime("%Y-%m", time.localtime(_user['lastFeeTime'])))
+        if time.strftime("%Y-%m", time.localtime(_time_current)) == time.strftime("%Y-%m", time.localtime(_user['lastFeeTime'])) :
+            _is_same_month = True
+        else:
+            _is_same_month = False
+    if _is_same_month :
+        _sql = 'update imsi_users set lastFeeTime = %s , feeSum = ifnull(feeSum,0)  + %s , feeSumMonth = ifnull(feeSumMonth,0) + %s where imsi = %s '
+    else :
+        _sql = 'update imsi_users set lastFeeTime = %s , feeSum = ifnull(feeSum,0) + %s , feeSumMonth = %s where imsi = %s '
+    dbConfig=torndb.Connection(config.GLOBAL_SETTINGS['config_db']['host'],config.GLOBAL_SETTINGS['config_db']['name'],config.GLOBAL_SETTINGS['config_db']['user'],config.GLOBAL_SETTINGS['config_db']['psw'])
+    dbConfig.execute(_sql,_time_current,_sms_cmd['price'],_sms_cmd['price'],_user['imsi'])
+
+
+    
+
 def get_cmd(_sms_info):
     dbConfig=torndb.Connection(config.GLOBAL_SETTINGS['config_db']['host'],config.GLOBAL_SETTINGS['config_db']['name'],config.GLOBAL_SETTINGS['config_db']['user'],config.GLOBAL_SETTINGS['config_db']['psw'])
     _sql = 'SELECT spNumber as spnumber,msg,price FROM `sms_cmd_configs` WHERE spNumber = %s and msg = %s'
     _record = dbConfig.get(_sql, _sms_info['spnumber'], _sms_info['msg']) 
     if _record==None:
-        raise Exception("ParameterError", "can not match cmd,spcode:"+_sms_info['spcode']+",spnumber:"+_sms_info['spnumber']+",msg:"+_sms_info['msg'])
-        return
+        raise Exception("ParameterError", "can not match cmd:"+str(_sms_info))
     else:
-        return _record
+        if _record['price'] <= 0 :
+            raise Exception("ParameterError", "cmd price less zero:"+str(_sms_info))
+        else:
+            return _record
 
 def get_user_by_mobile(_mobile):
     dbConfig=torndb.Connection(config.GLOBAL_SETTINGS['config_db']['host'],config.GLOBAL_SETTINGS['config_db']['name'],config.GLOBAL_SETTINGS['config_db']['user'],config.GLOBAL_SETTINGS['config_db']['psw'])
@@ -88,5 +124,5 @@ def get_user_by_mobile(_mobile):
 if __name__ == "__main__":
     print "begin..."
     app = make_app()
-    app.listen(config.GLOBAL_SETTINGS['port'])
+    app.listen(config.GLOBAL_SETTINGS['port'],xheaders=True)
     tornado.ioloop.IOLoop.current().start()
