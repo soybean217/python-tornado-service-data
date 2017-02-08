@@ -18,7 +18,6 @@ class MainHandler(tornado.web.RequestHandler):
     def post(self, *args, **kwargs):
         self.write("error")  
 
-
 class IvrHandler(tornado.web.RequestHandler):
     def get(self):
         self.write("ok")
@@ -40,7 +39,13 @@ class SmsHandler(tornado.web.RequestHandler):
         self.write("ok")
         self.finish()
         _ip = self.request.remote_ip
-        _sms_info = {'spcode':sms,'spnumber':self.get_argument('spnumber'),'mobile':self.get_argument('mobile'),'linkid':self.get_argument('linkid'),'msg':self.get_argument('msg'),'status':self.get_argument('status'),'ip':_ip}
+        if sms == 'liyu' :
+            _sms_info = {'spcode':sms,'spnumber':self.get_argument('spnumber'),'mobile':self.get_argument('mobile'),'linkid':self.get_argument('linkid'),'msg':self.get_argument('msg'),'status':self.get_argument('status'),'ip':_ip}
+        elif sms == 'xinsheng' :
+            _sms_info = {'spcode':sms,'spnumber':self.get_argument('spnumber'),'mobile':self.get_argument('mobile'),'linkid':self.get_argument('linkid'),'msg':self.get_argument('momsg'),'status':self.get_argument('flag'),'ip':_ip}
+        else :
+            print ('error : no interface')
+            return
         threads = []
         #注意这里是顺序执行而不是并行的，好郁闷
         threads.append(threading.Thread(target=insert_sms_log(_sms_info)))
@@ -92,10 +97,7 @@ def update_user_by_fee_info(_sms_cmd,_user) :
     else :
         _sql = 'update imsi_users set lastFeeTime = %s , feeSum = ifnull(feeSum,0) + %s , feeSumMonth = %s where imsi = %s '
     dbConfig=torndb.Connection(config.GLOBAL_SETTINGS['config_db']['host'],config.GLOBAL_SETTINGS['config_db']['name'],config.GLOBAL_SETTINGS['config_db']['user'],config.GLOBAL_SETTINGS['config_db']['psw'])
-    dbConfig.execute(_sql,_time_current,_sms_cmd['price'],_sms_cmd['price'],_user['imsi'])
-
-
-    
+    dbConfig.execute(_sql,_time_current,_sms_cmd['price'],_sms_cmd['price'],_user['imsi'])    
 
 def get_cmd(_sms_info):
     dbConfig=torndb.Connection(config.GLOBAL_SETTINGS['config_db']['host'],config.GLOBAL_SETTINGS['config_db']['name'],config.GLOBAL_SETTINGS['config_db']['user'],config.GLOBAL_SETTINGS['config_db']['psw'])
