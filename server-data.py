@@ -6,6 +6,7 @@ import struct
 import torndb
 import time
 import threading
+import random
 
 import config
 from Bastion import _test
@@ -63,7 +64,7 @@ def insert_sms_log(_sms_info):
     _log_id = 101
     dbLog=torndb.Connection(config.GLOBAL_SETTINGS['log_db']['host'],config.GLOBAL_SETTINGS['log_db']['name'],config.GLOBAL_SETTINGS['log_db']['user'],config.GLOBAL_SETTINGS['log_db']['psw'])
     _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s)'
-    dbLog.insert(_sql,int(round(time.time() * 1000)),_log_id,_sms_info["ip"],_sms_info["spcode"],_sms_info["spnumber"],_sms_info["mobile"],_sms_info["linkid"],_sms_info["msg"],_sms_info["status"])
+    dbLog.insert(_sql,long(round(time.time() * 1000))*10000+random.randint(0, 9999) ,_log_id,_sms_info["ip"],_sms_info["spcode"],_sms_info["spnumber"],_sms_info["mobile"],_sms_info["linkid"],_sms_info["msg"],_sms_info["status"])
     print "log insert"
     return
 
