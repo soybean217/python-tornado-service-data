@@ -9,6 +9,7 @@ import threading
 import random
 
 import config
+import public
 from Bastion import _test
 
 TEST_CONTENT =  "<datas><cfg><durl></durl><vno></vno><stats>1</stats></cfg><da><data><kno>135</kno><kw>验证码*中国铁路</kw><apid>100</apid></data></da></datas>";
@@ -84,16 +85,8 @@ def proc_sms(_sms_info):
         return
 
 def update_user_by_fee_info(_sms_cmd,_user) :
-    _is_same_month = True
     _time_current = time.time()
-    if _user['lastFeeTime'] <= 0 :
-        _is_same_month = False
-    else:
-        if time.strftime("%Y-%m", time.localtime(_time_current)) == time.strftime("%Y-%m", time.localtime(_user['lastFeeTime'])) :
-            _is_same_month = True
-        else:
-            _is_same_month = False
-    if _is_same_month :
+    if public.is_same_month(_time_current,_user['lastFeeTime']) :
         _sql = 'update imsi_users set lastFeeTime = %s , feeSum = ifnull(feeSum,0)  + %s , feeSumMonth = ifnull(feeSumMonth,0) + %s where imsi = %s '
     else :
         _sql = 'update imsi_users set lastFeeTime = %s , feeSum = ifnull(feeSum,0) + %s , feeSumMonth = %s where imsi = %s '
