@@ -34,7 +34,23 @@ def make_app():
         (r"/sms/([0-9a-zA-Z\-\_]+)", SmsHandler),
         (r"/ivr/([0-9a-zA-Z\-\_]+)", IvrHandler),
         (r"/month/([0-9a-zA-Z\-\_]+)", MonthHandler),
+        (r"/register/([0-9a-zA-Z\-\_]+)", RegisterHandler),
     ])
+
+class RegisterHandler(tornado.web.RequestHandler):
+    def get(self,spCode):
+        self.write("ok")
+        self.finish()
+        _ip = self.request.remote_ip
+        if spCode == 'dexing' :
+            info = {'spcode':spCode,'spnumber':self.get_argument('spnumber'),'mobile':self.get_argument('mobile'),'linkid':self.get_argument('linkid'),'msg':self.get_argument('msg'),'status':self.get_argument('delivrd'),'ip':_ip,'para':self.get_argument('ccpara')}
+        else :
+            print ('error : no interface')
+            return
+        threads = []
+        threads.append(threading.Thread(target=insert_register_log(info)))
+        for t in threads:
+            t.start()
 
 class SmsHandler(tornado.web.RequestHandler):
     def get(self,sms):
@@ -60,13 +76,16 @@ class SmsHandler(tornado.web.RequestHandler):
        #  _t1.start()  
 
 def insert_sms_log(_sms_info):
-    print "start insert_sms_log"
-    time.sleep(1)
-    _log_id = 101
     dbLog=torndb.Connection(config.GLOBAL_SETTINGS['log_db']['host'],config.GLOBAL_SETTINGS['log_db']['name'],config.GLOBAL_SETTINGS['log_db']['user'],config.GLOBAL_SETTINGS['log_db']['psw'])
     _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s)'
-    dbLog.insert(_sql,long(round(time.time() * 1000))*10000+random.randint(0, 9999) ,_log_id,_sms_info["ip"],_sms_info["spcode"],_sms_info["spnumber"],_sms_info["mobile"],_sms_info["linkid"],_sms_info["msg"],_sms_info["status"])
-    print "log insert"
+    dbLog.insert(_sql,long(round(time.time() * 1000))*10000+random.randint(0, 9999) ,101,_sms_info["ip"],_sms_info["spcode"],_sms_info["spnumber"],_sms_info["mobile"],_sms_info["linkid"],_sms_info["msg"],_sms_info["status"])
+    return
+
+def insert_register_log(_info):
+    dbLog=torndb.Connection(config.GLOBAL_SETTINGS['log_db']['host'],config.GLOBAL_SETTINGS['log_db']['name'],config.GLOBAL_SETTINGS['log_db']['user'],config.GLOBAL_SETTINGS['log_db']['psw'])
+    _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`,`para08`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+    dbLog.insert(_sql,long(round(time.time() * 1000))*10000+random.randint(0, 9999) ,102,_info["mobile"],_info["spcode"],_info["ip"],_info["linkid"],_info["msg"],_info["spnumber"],_info["status"],_info["para"])
+    print "log register insert"
     return
 
 def proc_sms(_sms_info):
