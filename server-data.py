@@ -74,6 +74,9 @@ class SmsHandler(tornado.web.RequestHandler):
         elif sms == 'zhongketianlang':
             _sms_info = {'spcode': sms, 'spnumber': self.get_argument('spnum'), 'mobile': self.get_argument(
                 'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('mocontents'), 'status': self.get_argument('status'), 'ip': _ip, 'feetime': self.get_argument('feetime')}
+        elif sms == 'youle':
+            _sms_info = {'spcode': sms, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
+                'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('momsg'), 'status': '', 'ip': _ip, 'feetime': ''}
         else:
             print ('error : no interface')
             return
