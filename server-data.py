@@ -14,9 +14,9 @@ from Bastion import _test
 import MySQLdb
 from DBUtils.PooledDB import PooledDB
 poolConfig = PooledDB(MySQLdb, 5, host=config.GLOBAL_SETTINGS['config_db']['host'], user=config.GLOBAL_SETTINGS['config_db']['user'], passwd=config.GLOBAL_SETTINGS[
-                      'config_db']['psw'], db=config.GLOBAL_SETTINGS['config_db']['name'], port=config.GLOBAL_SETTINGS['config_db']['port'], setsession=['SET AUTOCOMMIT = 1'], cursorclass=MySQLdb.cursors.DictCursor)
+                      'config_db']['psw'], db=config.GLOBAL_SETTINGS['config_db']['name'], port=config.GLOBAL_SETTINGS['config_db']['port'], setsession=['SET AUTOCOMMIT = 1'], cursorclass=MySQLdb.cursors.DictCursor, charset="utf8")
 poolLog = PooledDB(MySQLdb, 5, host=config.GLOBAL_SETTINGS['log_db']['host'], user=config.GLOBAL_SETTINGS['log_db']['user'], passwd=config.GLOBAL_SETTINGS[
-    'log_db']['psw'], db=config.GLOBAL_SETTINGS['log_db']['name'], port=config.GLOBAL_SETTINGS['log_db']['port'], setsession=['SET AUTOCOMMIT = 1'], cursorclass=MySQLdb.cursors.DictCursor)
+    'log_db']['psw'], db=config.GLOBAL_SETTINGS['log_db']['name'], port=config.GLOBAL_SETTINGS['log_db']['port'], setsession=['SET AUTOCOMMIT = 1'], cursorclass=MySQLdb.cursors.DictCursor, charset="utf8")
 
 TEST_CONTENT = "<datas><cfg><durl></durl><vno></vno><stats>1</stats></cfg><da><data><kno>135</kno><kw>验证码*中国铁路</kw><apid>100</apid></data></da></datas>"
 
@@ -114,12 +114,12 @@ def insert_sms_log(_sms_info):
 
 
 def insert_register_log(_info):
-    dbLog = poolLog.connection()
+    _dbLog = poolLog.connection()
     _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`,`para08`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
     _paras = (long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 102,
               _info["mobile"], _info["spcode"], _info["ip"], _info["linkid"], _info["msg"], _info["spnumber"], _info["status"], _info["para"])
-    dbLog.cursor().execute(_sql, _paras)
-    dbLog.close()
+    _dbLog.cursor().execute(_sql, _paras)
+    _dbLog.close()
     return
 
 
@@ -152,15 +152,15 @@ def update_user_by_fee_info(_sms_cmd, _user):
 
 
 def get_cmd(_sms_info):
-    dbConfig = poolConfig.connection()
-    cur = dbConfig.cursor()
+    _dbConfig = poolConfig.connection()
+    _cur = _dbConfig.cursor()
     _sql = 'SELECT spNumber as spnumber,msg,price FROM `sms_cmd_configs` WHERE spNumber = %s and msg = %s'
     # _record = dbConfig.get(_sql, _sms_info['spnumber'], _sms_info['msg'])
     _paras = (_sms_info['spnumber'], _sms_info['msg'])
-    cur.execute(_sql, _paras)
-    _record = cur.fetchone()
-    cur.close()
-    dbConfig.close()
+    _cur.execute(_sql, _paras)
+    _record = _cur.fetchone()
+    _cur.close()
+    _dbConfig.close()
     if _record == None:
         raise Exception("ParameterError",
                         "can not match cmd:" + str(_sms_info))
