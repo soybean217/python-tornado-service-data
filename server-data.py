@@ -7,6 +7,7 @@ import torndb
 import time
 import threading
 import random
+import json
 
 import config
 import public
@@ -19,6 +20,10 @@ poolLog = PooledDB(MySQLdb, 5, host=config.GLOBAL_SETTINGS['log_db']['host'], us
     'log_db']['psw'], db=config.GLOBAL_SETTINGS['log_db']['name'], port=config.GLOBAL_SETTINGS['log_db']['port'], setsession=['SET AUTOCOMMIT = 1'], cursorclass=MySQLdb.cursors.DictCursor, charset="utf8")
 
 TEST_CONTENT = "<datas><cfg><durl></durl><vno></vno><stats>1</stats></cfg><da><data><kno>135</kno><kw>验证码*中国铁路</kw><apid>100</apid></data></da></datas>"
+
+systemConfigs = {}
+channelConfigs = {}
+targetConfigs = {}
 
 
 class MainHandler(tornado.web.RequestHandler):
@@ -49,7 +54,48 @@ def make_app():
         (r"/ivr/([0-9a-zA-Z\-\_]+)", IvrHandler),
         (r"/month/([0-9a-zA-Z\-\_]+)", MonthHandler),
         (r"/register/([0-9a-zA-Z\-\_]+)", RegisterHandler),
+        (r"/getmobi", GetMobiHandler),
     ])
+
+
+class GetMobiHandler(tornado.web.RequestHandler):
+
+    def get(self):
+        _result = {}
+        threads = []
+        if self.checkParameter():
+            _dbConfig = poolConfig.connection()
+            _cur = _dbConfig.cursor()
+            _sql = 'SELECT mobile,imsi FROM `imsi_users` WHERE imsi = ( SELECT imsi FROM `register_user_relations` WHERE apid = %s and getTime > (%s-80000) and ifnull(registerChannelId,1)=1 limit 1)'
+            _cur.execute(_sql, (self.get_argument('apid'), time.time()))
+            _record = _cur.fetchone()
+            if _record == None:
+                _result['result'] = 'no valid mobile'
+            else:
+                if len(_record['mobile']) == 13:
+                    _result['no'] = _record['mobile'][2:13]
+                else:
+                    _result['no'] = _record['mobile']
+                threads.append(threading.Thread(
+                    target=update_relation(_record['imsi'], self.get_argument('apid'), self.get_argument('aid'))))
+                _info = {'ip': self.request.remote_ip, 'mobile': _result['no'],
+                         'query': self.request.query, 'rsp': json.dumps(_result)}
+                threads.append(threading.Thread(
+                    target=insert_fetch_log(_info)))
+            _cur.close()
+            _dbConfig.close()
+        else:
+            _result['result'] = 'invalid data'
+        self.write(json.dumps(_result))
+        self.finish()
+        for t in threads:
+            t.start()
+
+    def checkParameter(self):
+        result = False
+        if self.get_argument('aid') in channelConfigs.keys() and channelConfigs[self.get_argument('aid')]['state'] == 'open' and channelConfigs[self.get_argument('aid')]['authKey'] == self.get_argument('authkey') and int(self.get_argument('apid')) in targetConfigs.keys():
+            result = True
+        return result
 
 
 class RegisterHandler(tornado.web.RequestHandler):
@@ -123,6 +169,16 @@ def insert_register_log(_info):
     return
 
 
+def insert_fetch_log(_info):
+    _dbLog = poolLog.connection()
+    _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`) values (%s,%s,%s,%s,%s,%s)'
+    _paras = (long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 321,
+              _info["mobile"], _info["ip"], _info["query"], _info["rsp"])
+    _dbLog.cursor().execute(_sql, _paras)
+    _dbLog.close()
+    return
+
+
 def proc_sms(_sms_info):
     try:
         _sms_cmd = get_cmd(_sms_info)
@@ -132,6 +188,19 @@ def proc_sms(_sms_info):
         else:
             update_user_by_fee_info(_sms_cmd, _user)
             return
+    except "ParameterError", _argument:
+        print "ParameterError:", _argument
+    else:
+        return
+
+
+def update_relation(imsi, apid, aid):
+    try:
+        _dbConfig = poolConfig.connection()
+        _sql = 'update register_user_relations set registerChannelId = %s ,  fetchTime = %s where `imsi`=%s and apid=%s'
+        _paras = (aid, time.time(), imsi, apid)
+        _dbConfig.cursor().execute(_sql, _paras)
+        _dbConfig.close()
     except "ParameterError", _argument:
         print "ParameterError:", _argument
     else:
@@ -190,8 +259,35 @@ def get_user_by_mobile(_mobile):
     return _record
 
 
+def cache_config():
+    _dbConfig = poolConfig.connection()
+    _cur = _dbConfig.cursor()
+    _sql = 'SELECT * FROM `system_configs` '
+    _cur.execute(_sql)
+    _recordRsp = _cur.fetchall()
+    for _t in _recordRsp:
+        systemConfigs[_t['title']] = _t['detail']
+    # print(systemConfigs)
+    _sql = 'SELECT * FROM `register_channels` '
+    _cur.execute(_sql)
+    _recordRsp = _cur.fetchall()
+    for _t in _recordRsp:
+        channelConfigs[_t['aid']] = _t
+    # print(channelConfigs)
+    _sql = 'SELECT * FROM `register_targets` '
+    _cur.execute(_sql)
+    _recordRsp = _cur.fetchall()
+    for _t in _recordRsp:
+        targetConfigs[_t['apid']] = _t
+    # print(targetConfigs)
+    _cur.close()
+    _dbConfig.close()
+    return
+
 if __name__ == "__main__":
     print("begin...")
     app = make_app()
+    cache_config()
+    tornado.ioloop.PeriodicCallback(cache_config, 6000).start()
     app.listen(config.GLOBAL_SETTINGS['port'], xheaders=True)
     tornado.ioloop.IOLoop.current().start()
