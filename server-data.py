@@ -66,7 +66,7 @@ class GetMobiHandler(tornado.web.RequestHandler):
         if self.checkParameter():
             _dbConfig = poolConfig.connection()
             _cur = _dbConfig.cursor()
-            _sql = 'SELECT mobile,imsi FROM `imsi_users` WHERE imsi = ( SELECT imsi FROM `register_user_relations` WHERE apid = %s and getTime > (%s-80000) and ifnull(registerChannelId,1)=1 limit 1)'
+            _sql = 'SELECT mobile,imsi FROM `imsi_users` WHERE imsi = ( SELECT imsi FROM `register_user_relations` WHERE apid = %s and getTime > (%s-87400) and ifnull(registerChannelId,1)=1 limit 1)'
             _cur.execute(_sql, (self.get_argument('apid'), time.time()))
             _record = _cur.fetchone()
             if _record == None:
