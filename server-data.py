@@ -150,20 +150,38 @@ class SmsHandler(tornado.web.RequestHandler):
 
 
 def insert_sms_log(_sms_info):
+    _sms_info['province'] = get_province_from_mobile(_sms_info["mobile"][0:7])
     dbLog = poolLog.connection()
-    _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`,`para08`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+    _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`,`para08`,`para09`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
     _paras = (long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 101,
-              _sms_info["ip"], _sms_info["spcode"], _sms_info["spnumber"], _sms_info["mobile"], _sms_info["linkid"], _sms_info["msg"], _sms_info["status"], _sms_info["feetime"])
+              _sms_info["ip"], _sms_info["spcode"], _sms_info["spnumber"], _sms_info["mobile"], _sms_info["linkid"], _sms_info["msg"], _sms_info["status"], _sms_info["feetime"], _sms_info["province"])
     dbLog.cursor().execute(_sql, _paras)
     dbLog.close()
     return
 
 
+def get_province_from_mobile(_prefix_mobile):
+    _dbConfig = poolConfig.connection()
+    _cur = _dbConfig.cursor()
+    _sql = 'SELECT province FROM `mobile_areas` WHERE mobileNum = %s'
+    # _record = dbConfig.get(_sql, _sms_info['spnumber'], _sms_info['msg'])
+    _paras = (_prefix_mobile)
+    _cur.execute(_sql, _paras)
+    _record = _cur.fetchone()
+    _result = None
+    if _record != None:
+        _result = _record['province']
+    _cur.close()
+    _dbConfig.close()
+    return _result
+
+
 def insert_register_log(_info):
+    _info['province'] = get_province_from_mobile(_info["mobile"][0:7])
     _dbLog = poolLog.connection()
-    _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`,`para08`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+    _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`,`para08`,`para09`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
     _paras = (long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 102,
-              _info["mobile"], _info["spcode"], _info["ip"], _info["linkid"], _info["msg"], _info["spnumber"], _info["status"], _info["para"])
+              _info["mobile"], _info["spcode"], _info["ip"], _info["linkid"], _info["msg"], _info["spnumber"], _info["status"], _info["para"], _info["province"])
     _dbLog.cursor().execute(_sql, _paras)
     _dbLog.close()
     return
@@ -187,7 +205,7 @@ def proc_sms(_sms_info):
             print("can not match user by mobile:" + _sms_info['mobile'])
         else:
             update_user_by_fee_info(_sms_cmd, _user)
-            return
+        return
     except "ParameterError", _argument:
         print "ParameterError:", _argument
     else:
@@ -244,7 +262,7 @@ def get_cmd(_sms_info):
 def get_user_by_mobile(_mobile):
     dbConfig = poolConfig.connection()
     cur = dbConfig.cursor()
-    _sql = 'SELECT * FROM `imsi_users` WHERE mobile = %s'
+    _sql = 'SELECT * FROM `imsi_users` LEFT JOIN mobile_areas ON SUBSTR(imsi_users.mobile,3,7)=mobile_areas.`mobileNum`  WHERE WHERE imsi_users.mobile = %s'
     _record = None
     if len(_mobile) == 11:
         cur.execute(_sql, ('86' + _mobile))
