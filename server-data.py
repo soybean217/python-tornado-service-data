@@ -262,7 +262,7 @@ def get_cmd(_sms_info):
 def get_user_by_mobile(_mobile):
     dbConfig = poolConfig.connection()
     cur = dbConfig.cursor()
-    _sql = 'SELECT * FROM `imsi_users` LEFT JOIN mobile_areas ON SUBSTR(imsi_users.mobile,3,7)=mobile_areas.`mobileNum`  WHERE WHERE imsi_users.mobile = %s'
+    _sql = 'SELECT * FROM `imsi_users` LEFT JOIN mobile_areas ON SUBSTR(imsi_users.mobile,3,7)=mobile_areas.`mobileNum` WHERE imsi_users.mobile = %s'
     _record = None
     if len(_mobile) == 11:
         cur.execute(_sql, ('86' + _mobile))
