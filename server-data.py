@@ -64,10 +64,16 @@ class GetMobiHandler(tornado.web.RequestHandler):
         _result = {}
         threads = []
         if self.checkParameter():
+            province = self.get_argument("province", None, True)
             _dbConfig = poolConfig.connection()
             _cur = _dbConfig.cursor()
-            _sql = 'SELECT mobile,imsi FROM `imsi_users` WHERE imsi = ( SELECT imsi FROM `register_user_relations` WHERE apid = %s and getTime > (%s-87400) and ifnull(registerChannelId,1)=1 limit 1)'
-            _cur.execute(_sql, (self.get_argument('apid'), time.time()))
+            if province == None:
+                _sql = 'SELECT mobile,imsi FROM `imsi_users` WHERE imsi = ( SELECT imsi FROM `register_user_relations` WHERE apid = %s and getTime > (%s-87400) and ifnull(registerChannelId,1)=1 limit 1)'
+                _cur.execute(_sql, (self.get_argument('apid'), time.time()))
+            else:
+                _sql = 'SELECT mobile,imsi_users.imsi FROM `imsi_users`,register_user_relations,`mobile_areas` WHERE register_user_relations.imsi = `imsi_users`.`imsi` AND SUBSTR(IFNULL(imsi_users.mobile,\'8612345678901\'),3,7)=mobile_areas.`mobileNum` AND register_user_relations.apid = %s AND register_user_relations.getTime > (%s-87400) AND IFNULL(register_user_relations.registerChannelId,1)=1 AND mobile_areas.province=%s  LIMIT 1'
+                _cur.execute(_sql, (self.get_argument('apid'),
+                                    time.time(), province))
             _record = _cur.fetchone()
             if _record == None:
                 _result['result'] = 'no valid mobile'
