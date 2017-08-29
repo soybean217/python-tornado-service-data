@@ -107,7 +107,7 @@ class RegisterHandler(tornado.web.RequestHandler):
                 'linkid'), 'msg': self.get_argument('msg'), 'status': self.get_argument('delivrd'), 'ip': _ip, 'para': self.get_argument('ccpara')}
         elif spCode == 'kaixingyuan':
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument('mobile'), 'linkid': self.get_argument(
-                'orderId'), 'msg': self.get_argument('cmd'), 'status': 'delivrd', 'ip': _ip, 'para': self.get_argument('ccpara')}
+                'orderId'), 'msg': self.get_argument('cmd'), 'status': 'delivrd', 'ip': _ip, 'para': self.get_argument('cpparm')}
         else:
             print('error : no interface')
             return
