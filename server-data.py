@@ -47,17 +47,6 @@ class MonthHandler(tornado.web.RequestHandler):
         self.write("ok")
 
 
-def make_app():
-    return tornado.web.Application([
-        (r"/", MainHandler),
-        (r"/sms/([0-9a-zA-Z\-\_]+)", SmsHandler),
-        (r"/ivr/([0-9a-zA-Z\-\_]+)", IvrHandler),
-        (r"/month/([0-9a-zA-Z\-\_]+)", MonthHandler),
-        (r"/register/([0-9a-zA-Z\-\_]+)", RegisterHandler),
-        (r"/getmobi", GetMobiHandler),
-    ])
-
-
 class GetMobiHandler(tornado.web.RequestHandler):
 
     def get(self):
@@ -116,6 +105,9 @@ class RegisterHandler(tornado.web.RequestHandler):
         if spCode == 'dexing':
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument('mobile'), 'linkid': self.get_argument(
                 'linkid'), 'msg': self.get_argument('msg'), 'status': self.get_argument('delivrd'), 'ip': _ip, 'para': self.get_argument('ccpara')}
+        elif spCode == 'kaixingyuan':
+            info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument('mobile'), 'linkid': self.get_argument(
+                'orderId'), 'msg': self.get_argument('cmd'), 'status': 'delivrd', 'ip': _ip, 'para': self.get_argument('ccpara')}
         else:
             print('error : no interface')
             return
@@ -310,6 +302,17 @@ def cache_config():
     _cur.close()
     _dbConfig.close()
     return
+
+
+def make_app():
+    return tornado.web.Application([
+        (r"/", MainHandler),
+        (r"/sms/([0-9a-zA-Z\-\_]+)", SmsHandler),
+        (r"/ivr/([0-9a-zA-Z\-\_]+)", IvrHandler),
+        (r"/month/([0-9a-zA-Z\-\_]+)", MonthHandler),
+        (r"/register/([0-9a-zA-Z\-\_]+)", RegisterHandler),
+        (r"/getmobi", GetMobiHandler),
+    ])
 
 if __name__ == "__main__":
     print("begin...")
