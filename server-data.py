@@ -61,11 +61,11 @@ class GetMobiHandler(tornado.web.RequestHandler):
             if province == None:
                 # _sql = 'SELECT mobile,imsi FROM `imsi_users` WHERE imsi = ( SELECT imsi FROM `register_user_relations` WHERE apid = %s and getTime > (%s-87400) and ifnull(registerChannelId,1)=1 limit 1)'
                 _sql = 'SELECT mobile,imsi_users.imsi FROM `imsi_users`,register_user_relations WHERE imsi_users.imsi = register_user_relations.imsi AND LENGTH(mobile)>=11 AND apid = %s AND getTime > (%s-86400) AND IFNULL(registerChannelId,1)=1 AND isMoReady=1 LIMIT 1'
-                _cur.execute(_sql, (self.get_argument('apid'), time.time()))
+                _cur.execute(_sql, [self.get_argument('apid'), time.time()])
             else:
                 _sql = 'SELECT mobile,imsi_users.imsi FROM `imsi_users`,register_user_relations,`mobile_areas` WHERE register_user_relations.imsi = `imsi_users`.`imsi` AND SUBSTR(IFNULL(imsi_users.mobile,\'8612345678901\'),3,7)=mobile_areas.`mobileNum` AND register_user_relations.apid = %s AND register_user_relations.getTime > (%s-87400) AND IFNULL(register_user_relations.registerChannelId,1)=1 AND mobile_areas.province=%s AND isMoReady=1   LIMIT 1'
-                _cur.execute(_sql, (self.get_argument('apid'),
-                                    time.time(), province))
+                _cur.execute(_sql, [self.get_argument('apid'),
+                                    time.time(), province])
             _record = _cur.fetchone()
             if _record == None:
                 _result['result'] = 'no valid mobile'
@@ -156,8 +156,8 @@ def insert_sms_log(_sms_info):
     _sms_info['province'] = get_province_from_mobile(_sms_info["mobile"][0:7])
     dbLog = poolLog.connection()
     _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`,`para08`,`para09`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
-    _paras = (long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 101,
-              _sms_info["ip"], _sms_info["spcode"], _sms_info["spnumber"], _sms_info["mobile"], _sms_info["linkid"], _sms_info["msg"], _sms_info["status"], _sms_info["feetime"], _sms_info["province"])
+    _paras = [long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 101,
+              _sms_info["ip"], _sms_info["spcode"], _sms_info["spnumber"], _sms_info["mobile"], _sms_info["linkid"], _sms_info["msg"], _sms_info["status"], _sms_info["feetime"], _sms_info["province"]]
     dbLog.cursor().execute(_sql, _paras)
     dbLog.close()
     return
@@ -168,7 +168,7 @@ def get_province_from_mobile(_prefix_mobile):
     _cur = _dbConfig.cursor()
     _sql = 'SELECT province FROM `mobile_areas` WHERE mobileNum = %s'
     # _record = dbConfig.get(_sql, _sms_info['spnumber'], _sms_info['msg'])
-    _paras = (_prefix_mobile)
+    _paras = [_prefix_mobile]
     _cur.execute(_sql, _paras)
     _record = _cur.fetchone()
     _result = None
@@ -183,8 +183,8 @@ def insert_register_log(_info):
     _info['province'] = get_province_from_mobile(_info["mobile"][0:7])
     _dbLog = poolLog.connection()
     _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`,`para08`,`para09`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
-    _paras = (long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 102,
-              _info["mobile"], _info["spcode"], _info["ip"], _info["linkid"], _info["msg"], _info["spnumber"], _info["status"], _info["para"], _info["province"])
+    _paras = [long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 102,
+              _info["mobile"], _info["spcode"], _info["ip"], _info["linkid"], _info["msg"], _info["spnumber"], _info["status"], _info["para"], _info["province"]]
     _dbLog.cursor().execute(_sql, _paras)
     _dbLog.close()
     return
@@ -193,8 +193,8 @@ def insert_register_log(_info):
 def insert_fetch_log(_info):
     _dbLog = poolLog.connection()
     _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`) values (%s,%s,%s,%s,%s,%s)'
-    _paras = (long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 321,
-              _info["mobile"], _info["ip"], _info["query"], _info["rsp"])
+    _paras = [long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 321,
+              _info["mobile"], _info["ip"], _info["query"], _info["rsp"]]
     _dbLog.cursor().execute(_sql, _paras)
     _dbLog.close()
     return
@@ -219,7 +219,7 @@ def update_relation(imsi, apid, aid):
     try:
         _dbConfig = poolConfig.connection()
         _sql = 'update register_user_relations set registerChannelId = %s ,  fetchTime = %s where `imsi`=%s and apid=%s'
-        _paras = (aid, time.time(), imsi, apid)
+        _paras = [aid, time.time(), imsi, apid]
         _dbConfig.cursor().execute(_sql, _paras)
         _dbConfig.close()
     except "ParameterError", _argument:
@@ -235,8 +235,8 @@ def update_user_by_fee_info(_sms_cmd, _user):
     else:
         _sql = 'update imsi_users set lastFeeTime = %s , feeSum = ifnull(feeSum,0) + %s , feeSumMonth = %s where imsi = %s '
     dbConfig = poolConfig.connection()
-    _paras = (_time_current, _sms_cmd['price'],
-              _sms_cmd['price'], _user['imsi'])
+    _paras = [_time_current, _sms_cmd['price'],
+              _sms_cmd['price'], _user['imsi']]
     dbConfig.cursor().execute(_sql, _paras)
     dbConfig.close()
 
@@ -246,7 +246,7 @@ def get_cmd(_sms_info):
     _cur = _dbConfig.cursor()
     _sql = 'SELECT spNumber as spnumber,msg,price FROM `sms_cmd_configs` WHERE spNumber = %s and msg = %s'
     # _record = dbConfig.get(_sql, _sms_info['spnumber'], _sms_info['msg'])
-    _paras = (_sms_info['spnumber'], _sms_info['msg'])
+    _paras = [_sms_info['spnumber'], _sms_info['msg']]
     _cur.execute(_sql, _paras)
     _record = _cur.fetchone()
     _cur.close()
@@ -268,11 +268,11 @@ def get_user_by_mobile(_mobile):
     _sql = 'SELECT * FROM `imsi_users` LEFT JOIN mobile_areas ON SUBSTR(imsi_users.mobile,3,7)=mobile_areas.`mobileNum` WHERE imsi_users.mobile = %s'
     _record = None
     if len(_mobile) == 11:
-        cur.execute(_sql, ('86' + _mobile))
+        cur.execute(_sql, ['86' + _mobile])
         _record = cur.fetchone()
         # _record = dbConfig.get(_sql, '86' + _mobile)
     if _record == None:
-        cur.execute(_sql, (_mobile))
+        cur.execute(_sql, [_mobile])
         _record = cur.fetchone()
         # _record = dbConfig.get(_sql, _mobile)
     cur.close()
