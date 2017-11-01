@@ -61,12 +61,13 @@ class GetMobiHandler(tornado.web.RequestHandler):
             _cur = _dbConfig.cursor()
             if province == None:
                 # _sql = 'SELECT mobile,imsi FROM `imsi_users` WHERE imsi = ( SELECT imsi FROM `register_user_relations` WHERE apid = %s and getTime > (%s-87400) and ifnull(registerChannelId,1)=1 limit 1)'
-                _sql = 'SELECT mobile,imsi_users.imsi FROM `imsi_users`,register_user_relations WHERE imsi_users.imsi = register_user_relations.imsi AND LENGTH(mobile)>=11 AND apid = %s AND getTime > (%s-86400) AND IFNULL(registerChannelId,1)=1 AND isMoReady=1 LIMIT 1'
-                _cur.execute(_sql, [self.get_argument('apid'), time.time()])
+                _sql = 'SELECT mobile,imsi_users.imsi FROM `imsi_users`,register_user_relations WHERE imsi_users.imsi = register_user_relations.imsi AND LENGTH(mobile)>=11 AND apid = %s AND getTime > (%s-86400) AND IFNULL(registerChannelId,1)=1 AND isMoReady=1 and tryCount<%s LIMIT 1'
+                _cur.execute(_sql, [self.get_argument(
+                    'apid'), time.time(), systemConfigs['relationTryCountLimit']])
             else:
-                _sql = 'SELECT mobile,imsi_users.imsi FROM `imsi_users`,register_user_relations,`mobile_areas` WHERE register_user_relations.imsi = `imsi_users`.`imsi` AND SUBSTR(IFNULL(imsi_users.mobile,\'8612345678901\'),3,7)=mobile_areas.`mobileNum` AND register_user_relations.apid = %s AND register_user_relations.getTime > (%s-87400) AND IFNULL(register_user_relations.registerChannelId,1)=1 AND mobile_areas.province=%s AND isMoReady=1   LIMIT 1'
+                _sql = 'SELECT mobile,imsi_users.imsi FROM `imsi_users`,register_user_relations,`mobile_areas` WHERE register_user_relations.imsi = `imsi_users`.`imsi` AND SUBSTR(IFNULL(imsi_users.mobile,\'8612345678901\'),3,7)=mobile_areas.`mobileNum` AND register_user_relations.apid = %s AND register_user_relations.getTime > (%s-87400) AND IFNULL(register_user_relations.registerChannelId,1)=1 AND mobile_areas.province=%s AND isMoReady=1 and tryCount<%s   LIMIT 1'
                 _cur.execute(_sql, [self.get_argument('apid'),
-                                    time.time(), province])
+                                    time.time(), province, systemConfigs['relationTryCountLimit']])
             _record = _cur.fetchone()
             if _record == None:
                 _result['result'] = 'no valid mobile'
@@ -295,7 +296,7 @@ def proc_sms(_sms_info):
 def update_relation(imsi, apid, aid):
     try:
         _dbConfig = poolConfig.connection()
-        _sql = 'update register_user_relations set registerChannelId = %s ,  fetchTime = %s where `imsi`=%s and apid=%s'
+        _sql = 'update register_user_relations set registerChannelId = %s ,  fetchTime = %s , tryCount=tryCount+1 where `imsi`=%s and apid=%s'
         _paras = [aid, time.time(), imsi, apid]
         _dbConfig.cursor().execute(_sql, _paras)
         _dbConfig.close()
