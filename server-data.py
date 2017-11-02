@@ -233,17 +233,17 @@ def proc_weixinMo(info):
         if expiredTime < int(_recordRsp['expiredTime']):
             expiredTime = int(_recordRsp['expiredTime'])
         if _recordRsp['testStatus'] == 'wxmo':
-            _sql = "update `test_imsis` set expiredTime=%s where imsi = %s"
+            _sql = "update `test_imsis` set expiredTime=%s,remark=%s,mobile=%s where imsi = %s"
         else:
-            _sql = "update `test_imsis` set expiredTime=%s,testStatus='wxmo' where imsi = %s"
-        _paras = [expiredTime, info['imsi']]
+            _sql = "update `test_imsis` set expiredTime=%s,remark=%s,mobile=%s,testStatus='wxmo' where imsi = %s"
+        _paras = [expiredTime, info['msg'], info['mobile'], info['imsi']]
         _cur.execute(_sql, _paras)
     else:
-        _sql = "insert into test_imsis (imsi,testStatus,expiredTime) values (%s,'wxmo',unix_timestamp(now())+86400)"
-        _paras = [info['imsi']]
+        _sql = "insert into test_imsis (imsi,testStatus,expiredTime,remark,mobile) values (%s,'wxmo',unix_timestamp(now())+86400,%s,%s)"
+        _paras = [info['imsi'], info['msg'], info['mobile']]
         _cur.execute(_sql, _paras)
-    _sql = "insert into wait_send_ads (targetMobile,msg) values (%s,'ztldtest')"
-    _paras = [info['mobile']]
+    _sql = "insert into wait_send_ads (targetMobile,msg,createTime,oriContent) values (%s,'ztldxtest',unix_timestamp(now()),%s)"
+    _paras = [info['mobile'], info['msg']]
     _cur.execute(_sql, _paras)
     _cur.close()
     dbConfig.close()
