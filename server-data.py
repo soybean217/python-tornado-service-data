@@ -12,15 +12,15 @@ import json
 import config
 from log import logger
 import public
-from Bastion import _test
 import MySQLdb
+from gevent.greenlet import Greenlet
+from gevent import monkey
+monkey.patch_all()
 from DBUtils.PooledDB import PooledDB
 poolConfig = PooledDB(MySQLdb, 5, host=config.GLOBAL_SETTINGS['config_db']['host'], user=config.GLOBAL_SETTINGS['config_db']['user'], passwd=config.GLOBAL_SETTINGS[
                       'config_db']['psw'], db=config.GLOBAL_SETTINGS['config_db']['name'], port=config.GLOBAL_SETTINGS['config_db']['port'], setsession=['SET AUTOCOMMIT = 1'], cursorclass=MySQLdb.cursors.DictCursor, charset="utf8")
 poolLog = PooledDB(MySQLdb, 5, host=config.GLOBAL_SETTINGS['log_db']['host'], user=config.GLOBAL_SETTINGS['log_db']['user'], passwd=config.GLOBAL_SETTINGS[
     'log_db']['psw'], db=config.GLOBAL_SETTINGS['log_db']['name'], port=config.GLOBAL_SETTINGS['log_db']['port'], setsession=['SET AUTOCOMMIT = 1'], cursorclass=MySQLdb.cursors.DictCursor, charset="utf8")
-
-TEST_CONTENT = "<datas><cfg><durl></durl><vno></vno><stats>1</stats></cfg><da><data><kno>135</kno><kw>验证码*中国铁路</kw><apid>100</apid></data></da></datas>"
 
 systemConfigs = {}
 channelConfigs = {}
@@ -38,8 +38,42 @@ class MainHandler(tornado.web.RequestHandler):
 
 class IvrHandler(tornado.web.RequestHandler):
 
-    def get(self):
+    def get(self, spCode):
         self.write("ok")
+        self.finish()
+        _info = None
+        _ip = self.request.remote_ip
+        if spCode == 'zhongketianlang':
+            _info = {'spcode': spCode, 'spnumber': self.get_argument('spnum'), 'mobile': self.get_argument(
+                'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('mocontents'), 'status': self.get_argument('status'), 'ip': _ip, 'feetime': self.get_argument('feetime'), 'query': str(self.request.query_arguments)}
+        else:
+            print('error : no interface')
+            return
+        if _info != None:
+            _g_insert_ivr_log = insert_ivr_log(_info)
+            _g_insert_ivr_log.start()
+
+
+class insert_ivr_log(Greenlet):
+
+    def __init__(self, info):
+        # super(greenlet, self).__init__()
+        Greenlet.__init__(self)
+        self.info = info
+
+    def run(self):
+        self.insertLog(self.info)
+
+    def insertLog(self, _sms_info):
+        _sms_info['province'] = get_province_from_mobile(
+            _sms_info["mobile"][0:7])
+        dbLog = poolLog.connection()
+        _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`,`para08`,`para09`,`para10`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+        _paras = [long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 103,
+                  _sms_info["mobile"], _sms_info["spcode"], _sms_info["spnumber"], _sms_info["ip"], _sms_info["linkid"], _sms_info["msg"], _sms_info["status"], _sms_info["feetime"], _sms_info["province"], _sms_info["query"]]
+        dbLog.cursor().execute(_sql, _paras)
+        dbLog.close()
+        return
 
 
 class MonthHandler(tornado.web.RequestHandler):
