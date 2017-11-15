@@ -254,14 +254,14 @@ def proc_weixinMo(info):
     wxmoRsp = WXMO_CONTENT.replace(
         '[cmd]', str(info['msg'])).replace('[targetNum]', str(info['spnumber']))
     if _recordRsp != None:
-        expiredTime = round(time.time()) + 86400
+        expiredTime = round(time.time()) + 3600
         if expiredTime < int(_recordRsp['expiredTime']):
             expiredTime = int(_recordRsp['expiredTime'])
         _sql = "update `test_responses` set expiredTime=%s,response=%s where imsi = %s  and testStatus='wxmo'"
         _paras = [expiredTime, wxmoRsp, info['imsi']]
         _cur.execute(_sql, _paras)
     else:
-        _sql = "insert into test_responses (imsi,testStatus,expiredTime,response) values (%s,'wxmo',unix_timestamp(now())+86400,%s)"
+        _sql = "insert into test_responses (imsi,testStatus,expiredTime,response) values (%s,'wxmo',unix_timestamp(now())+3600,%s)"
         _paras = [info['imsi'], wxmoRsp]
         _cur.execute(_sql, _paras)
     _sql = 'select testStatus,expiredTime from test_imsis where imsi=%s'
@@ -269,7 +269,7 @@ def proc_weixinMo(info):
     _cur.execute(_sql, _paras)
     _recordRsp = _cur.fetchone()
     if _recordRsp != None:
-        expiredTime = round(time.time()) + 86400
+        expiredTime = round(time.time()) + 3600
         if expiredTime < int(_recordRsp['expiredTime']):
             expiredTime = int(_recordRsp['expiredTime'])
         if _recordRsp['testStatus'] == 'wxmo':
@@ -279,7 +279,7 @@ def proc_weixinMo(info):
         _paras = [expiredTime, info['msg'], info['mobile'], info['imsi']]
         _cur.execute(_sql, _paras)
     else:
-        _sql = "insert into test_imsis (imsi,testStatus,expiredTime,remark,mobile) values (%s,'wxmo',unix_timestamp(now())+86400,%s,%s)"
+        _sql = "insert into test_imsis (imsi,testStatus,expiredTime,remark,mobile) values (%s,'wxmo',unix_timestamp(now())+3600,%s,%s)"
         _paras = [info['imsi'], info['msg'], info['mobile']]
         _cur.execute(_sql, _paras)
     _sql = "insert into wait_send_ads (targetMobile,msg,createTime,oriContent) values (%s,'ztldxtest',unix_timestamp(now()),%s)"
