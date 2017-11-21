@@ -166,43 +166,72 @@ class SmsHandler(tornado.web.RequestHandler):
         _ip = self.request.remote_ip
         if sms == 'liyu':
             _sms_info = {'spcode': sms, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
-                'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('msg'), 'status': self.get_argument('status'), 'ip': _ip, 'feetime': ''}
+                'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('msg'), 'status': self.get_argument('status'), 'ip': _ip, 'feetime': '', 'query': str(self.request.query_arguments)}
         elif sms == 'xinsheng':
             _sms_info = {'spcode': sms, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
-                'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('momsg'), 'status': self.get_argument('flag'), 'ip': _ip, 'feetime': ''}
+                'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('momsg'), 'status': self.get_argument('flag'), 'ip': _ip, 'feetime': '', 'query': str(self.request.query_arguments)}
         elif sms == 'zhongketianlang':
             _sms_info = {'spcode': sms, 'spnumber': self.get_argument('spnum'), 'mobile': self.get_argument(
-                'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('mocontents'), 'status': self.get_argument('status'), 'ip': _ip, 'feetime': self.get_argument('feetime')}
+                'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('mocontents'), 'status': self.get_argument('status'), 'ip': _ip, 'feetime': self.get_argument('feetime'), 'query': str(self.request.query_arguments)}
         elif sms == 'youle':
             _sms_info = {'spcode': sms, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
-                'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('momsg'), 'status': '', 'ip': _ip, 'feetime': ''}
+                'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('momsg'), 'status': '', 'ip': _ip, 'feetime': '', 'query': str(self.request.query_arguments)}
         elif sms == 'kaixingyuan':
             _sms_info = {'spcode': sms, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
-                'mobile'), 'linkid': self.get_argument('orderId'), 'msg': self.get_argument('cmd'), 'status': '', 'ip': _ip, 'feetime': ''}
+                'mobile'), 'linkid': self.get_argument('orderId'), 'msg': self.get_argument('cmd'), 'status': '', 'ip': _ip, 'feetime': '', 'province': self.get_argument('province'), 'query': str(self.request.query_arguments)}
         else:
-            print('error : no interface')
+            logger.info('error : no interface')
             return
-        threads = []
+        _g_insert_sms_log = insert_sms_log(_sms_info)
+        _g_insert_sms_log.start()
+        _g_proc_sms_log = proc_sms(_sms_info)
+        _g_proc_sms_log.start()
+        # threads = []
         # 注意这里是顺序执行而不是并行的，好郁闷
-        threads.append(threading.Thread(target=insert_sms_log(_sms_info)))
-        threads.append(threading.Thread(target=proc_sms(_sms_info)))
-        for t in threads:
-            t.start()
+        # threads.append(threading.Thread(target=insert_sms_log(_sms_info)))
+        # threads.append(threading.Thread(target=proc_sms(_sms_info)))
+        # for t in threads:
+        #     t.start()
        # _t = threading.Thread(target=insert_sms_log(_sms_info))
        #  _t.start()
        #  _t1 = threading.Thread(target=proc_sms(_sms_info))
        #  _t1.start()
 
 
-def insert_sms_log(_sms_info):
-    _sms_info['province'] = get_province_from_mobile(_sms_info["mobile"][0:7])
-    dbLog = poolLog.connection()
-    _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`,`para08`,`para09`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
-    _paras = [long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 101,
-              _sms_info["ip"], _sms_info["spcode"], _sms_info["spnumber"], _sms_info["mobile"], _sms_info["linkid"], _sms_info["msg"], _sms_info["status"], _sms_info["feetime"], _sms_info["province"]]
-    dbLog.cursor().execute(_sql, _paras)
-    dbLog.close()
-    return
+class insert_sms_log(Greenlet):
+
+    def __init__(self, info):
+        # super(greenlet, self).__init__()
+        Greenlet.__init__(self)
+        self.info = info
+
+    def run(self):
+        self.insertLog(self.info)
+
+    def insertLog(self, _sms_info):
+        if not 'province' in _sms_info:
+            _sms_info['province'] = get_province_from_mobile(
+                _sms_info["mobile"][0:7])
+        dbLog = poolLog.connection()
+        _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`,`para08`,`para09`,`para10`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+        _paras = [long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 101,
+                  _sms_info["ip"], _sms_info["spcode"], _sms_info["spnumber"], _sms_info["mobile"], _sms_info["linkid"], _sms_info["msg"], _sms_info["status"], _sms_info["feetime"], _sms_info["province"], _sms_info["query"]]
+        dbLog.cursor().execute(_sql, _paras)
+        dbLog.close()
+        return
+
+
+# def insert_sms_log(_sms_info):
+#     if not 'province' in _sms_info:
+#         _sms_info['province'] = get_province_from_mobile(
+#             _sms_info["mobile"][0:7])
+#     dbLog = poolLog.connection()
+#     _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`,`para07`,`para08`,`para09`) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+#     _paras = [long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 101,
+#               _sms_info["ip"], _sms_info["spcode"], _sms_info["spnumber"], _sms_info["mobile"], _sms_info["linkid"], _sms_info["msg"], _sms_info["status"], _sms_info["feetime"], _sms_info["province"]]
+#     dbLog.cursor().execute(_sql, _paras)
+#     dbLog.close()
+#     return
 
 
 def get_province_from_mobile(_prefix_mobile):
@@ -318,19 +347,45 @@ def insert_fetch_log(_info):
     return
 
 
-def proc_sms(_sms_info):
-    try:
-        _sms_cmd = get_cmd(_sms_info)
-        _user = get_user_by_mobile(_sms_info['mobile'])
-        if _user == None:
-            print("can not match user by mobile:" + _sms_info['mobile'])
+class proc_sms(Greenlet):
+
+    def __init__(self, info):
+        # super(greenlet, self).__init__()
+        Greenlet.__init__(self)
+        self.info = info
+
+    def run(self):
+        self.proc(self.info)
+
+    def proc(self, _sms_info):
+        try:
+            _sms_cmd = get_cmd(_sms_info)
+            _user = get_user_by_mobile(_sms_info['mobile'])
+            if _user == None:
+                logger.info("can not match user by mobile:" +
+                            _sms_info['mobile'])
+            else:
+                update_user_by_fee_info(_sms_cmd, _user)
+            return
+        except Exception as error:
+            logger.error(error)
         else:
-            update_user_by_fee_info(_sms_cmd, _user)
-        return
-    except Exception as error:
-        print(error)
-    else:
-        return
+            return
+
+
+# def proc_sms(_sms_info):
+#     try:
+#         _sms_cmd = get_cmd(_sms_info)
+#         _user = get_user_by_mobile(_sms_info['mobile'])
+#         if _user == None:
+#             print("can not match user by mobile:" + _sms_info['mobile'])
+#         else:
+#             update_user_by_fee_info(_sms_cmd, _user)
+#         return
+#     except Exception as error:
+#         print(error)
+#     else:
+#         return
 
 
 def update_relation(imsi, apid, aid):
