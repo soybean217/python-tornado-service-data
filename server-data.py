@@ -137,13 +137,14 @@ class GetMobiHandler(tornado.web.RequestHandler):
 class RegisterHandler(tornado.web.RequestHandler):
 
     def get(self, spCode):
-        self.write("ok")
-        self.finish()
         _ip = self.request.remote_ip
         if spCode == 'dexing':
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument('mobile'), 'linkid': self.get_argument(
                 'linkid'), 'msg': self.get_argument('msg'), 'status': self.get_argument('delivrd'), 'ip': _ip, 'para': self.get_argument('ccpara')}
         elif spCode == 'dexingwx':
+            info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument('mobile'), 'linkid': self.get_argument(
+                'linkid'), 'msg': self.get_argument('msg'), 'status': self.get_argument('delivrd'), 'ip': _ip, 'para': self.get_argument('ccpara')}
+        elif spCode == 'mhy':
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument('mobile'), 'linkid': self.get_argument(
                 'linkid'), 'msg': self.get_argument('msg'), 'status': self.get_argument('delivrd'), 'ip': _ip, 'para': self.get_argument('ccpara')}
         elif spCode == 'kaixingyuan':
@@ -152,8 +153,11 @@ class RegisterHandler(tornado.web.RequestHandler):
             info = {'spcode': spCode, 'spnumber': '12306', 'mobile': self.get_argument('mobile'), 'linkid': self.get_argument(
                 'orderId'), 'msg': '999', 'status': 'delivrd', 'ip': _ip, 'para': self.get_argument('cpparm')}
         else:
-            print('error : no interface')
+            logger.error('error : no interface')
+            self.write('{"error" : "no interface"}')
             return
+        self.write("ok")
+        self.finish()
         threads = []
         threads.append(threading.Thread(target=insert_register_log(info)))
         for t in threads:
@@ -333,6 +337,9 @@ class WeiXinMoHandler(tornado.web.RequestHandler):
         # self.finish()
         _ip = self.request.remote_ip
         if spCode == 'dexing':
+            info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
+                'mobile'),  'msg': self.get_argument('replyinfo'), 'ip': _ip}
+        if spCode == 'mhy':
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
                 'mobile'),  'msg': self.get_argument('replyinfo'), 'ip': _ip}
         else:
