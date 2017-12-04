@@ -339,7 +339,7 @@ class WeiXinMoHandler(tornado.web.RequestHandler):
         if spCode == 'dexing':
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
                 'mobile'),  'msg': self.get_argument('replyinfo'), 'ip': _ip}
-        if spCode == 'mhy':
+        elif spCode == 'mhy':
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
                 'mobile'),  'msg': self.get_argument('replyinfo'), 'ip': _ip}
         else:
