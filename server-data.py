@@ -88,7 +88,6 @@ class GetMobiHandler(tornado.web.RequestHandler):
 
     def get(self):
         _result = {}
-        threads = []
         # if self.get_argument('apid') != '105' and self.checkParameter():
         if self.checkParameter():
             # if False:
@@ -112,24 +111,71 @@ class GetMobiHandler(tornado.web.RequestHandler):
                     _result['no'] = _record['mobile'][2:13]
                 else:
                     _result['no'] = _record['mobile']
-                threads.append(threading.Thread(
-                    target=update_relation(_record['imsi'], self.get_argument('apid'), self.get_argument('aid'))))
+                # threads.append(threading.Thread(
+                # target=update_relation(_record['imsi'],
+                # self.get_argument('apid'), self.get_argument('aid'))))
+                _g_updateRelation = update_relation(
+                    _record['imsi'], self.get_argument('apid'), self.get_argument('aid'))
+                _g_updateRelation.start()
                 _info = {'ip': self.request.remote_ip, 'mobile': _result['no'],
                          'query': self.request.query, 'rsp': json.dumps(_result)}
-                threads.append(threading.Thread(
-                    target=insert_fetch_log(_info)))
+                _g_insertFetchLog = insert_fetch_log(_info)
+                _g_insertFetchLog.start()
+                # threads.append(threading.Thread(
+                #     target=insert_fetch_log(_info)))
             _cur.close()
             _dbConfig.close()
         else:
             _result['result'] = 'invalid data'
         self.write(json.dumps(_result))
         self.finish()
-        for t in threads:
-            t.start()
+        # for t in threads:
+        #     t.start()
 
     def checkParameter(self):
         result = False
         if self.get_argument('aid') in channelConfigs.keys() and channelConfigs[self.get_argument('aid')]['state'] == 'open' and channelConfigs[self.get_argument('aid')]['authKey'] == self.get_argument('authkey') and int(self.get_argument('apid')) in targetConfigs.keys():
+            result = True
+        return result
+
+
+def convertMobileTo86(mobile):
+    if len(mobile) == 11 and mobile.startswith('1'):
+        return '86' + mobile
+    else:
+        return mobile
+
+
+class GetMobiSmsHandler(tornado.web.RequestHandler):
+
+    def get(self):
+        _result = {}
+        threads = []
+        # if self.get_argument('apid') != '105' and self.checkParameter():
+        if self.checkParameter():
+            mobile = convertMobileTo86(self.get_argument('mobile'))
+            _dbLog = poolLog.connection()
+            _cur = _dbLog.cursor()
+            _sql = 'SELECT para05 FROM `log_general`.`log_async_generals` WHERE logid=311 AND para02=%s AND para07 = %s order by id desc LIMIT 1'
+            _cur.execute(_sql, [mobile, self.get_argument(
+                'apid')])
+            _record = _cur.fetchone()
+            if _record == None:
+                _result['result'] = 'no valid mobile'
+            else:
+                logger.debug(_record['para05'])
+            _cur.close()
+            _dbLog.close()
+        else:
+            _result['result'] = 'invalid data'
+        self.write(json.dumps(_result))
+        self.finish()
+        # for t in threads:
+        #     t.start()
+
+    def checkParameter(self):
+        result = False
+        if self.get_argument('aid') in channelConfigs.keys() and channelConfigs[self.get_argument('aid')]['authKey'] == self.get_argument('authkey') and int(self.get_argument('apid')) in targetConfigs.keys():
             result = True
         return result
 
@@ -354,14 +400,29 @@ class WeiXinMoHandler(tornado.web.RequestHandler):
             t.start()
 
 
-def insert_fetch_log(_info):
-    _dbLog = poolLog.connection()
-    _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`) values (%s,%s,%s,%s,%s,%s)'
-    _paras = [long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 321,
-              _info["mobile"], _info["ip"], _info["query"], _info["rsp"]]
-    _dbLog.cursor().execute(_sql, _paras)
-    _dbLog.close()
-    return
+class insert_fetch_log(Greenlet):
+
+    def __init__(self, info):
+        # super(greenlet, self).__init__()
+        Greenlet.__init__(self)
+        self.info = info
+
+    def run(self):
+        self.proc(self.info)
+
+    def proc(self, _info):
+        try:
+            _dbLog = poolLog.connection()
+            _sql = 'insert into log_async_generals (`id`,`logId`,`para01`,`para02`,`para03`,`para04`) values (%s,%s,%s,%s,%s,%s)'
+            _paras = [long(round(time.time() * 1000)) * 10000 + random.randint(0, 9999), 321,
+                      _info["mobile"], _info["ip"], _info["query"], _info["rsp"]]
+            _dbLog.cursor().execute(_sql, _paras)
+            _dbLog.close()
+            return
+        except Exception as error:
+            logger.error(error)
+        else:
+            return
 
 
 class proc_sms(Greenlet):
@@ -390,32 +451,29 @@ class proc_sms(Greenlet):
             return
 
 
-# def proc_sms(_sms_info):
-#     try:
-#         _sms_cmd = get_cmd(_sms_info)
-#         _user = get_user_by_mobile(_sms_info['mobile'])
-#         if _user == None:
-#             print("can not match user by mobile:" + _sms_info['mobile'])
-#         else:
-#             update_user_by_fee_info(_sms_cmd, _user)
-#         return
-#     except Exception as error:
-#         print(error)
-#     else:
-#         return
+class update_relation(Greenlet):
 
+    def __init__(self, imsi, apid, aid):
+        # super(greenlet, self).__init__()
+        Greenlet.__init__(self)
+        self.imsi = imsi
+        self.apid = apid
+        self.aid = aid
 
-def update_relation(imsi, apid, aid):
-    try:
-        _dbConfig = poolConfig.connection()
-        _sql = 'update register_user_relations set registerChannelId = %s ,  fetchTime = %s , tryCount=tryCount+1 where `imsi`=%s and apid=%s'
-        _paras = [aid, time.time(), imsi, apid]
-        _dbConfig.cursor().execute(_sql, _paras)
-        _dbConfig.close()
-    except Exception as error:
-        print(error)
-    else:
-        return
+    def run(self):
+        self.proc(self.imsi, self.apid, self.apid)
+
+    def proc(self,  imsi, apid, aid):
+        try:
+            _dbConfig = poolConfig.connection()
+            _sql = 'update register_user_relations set registerChannelId = %s ,  fetchTime = %s , tryCount=tryCount+1 where `imsi`=%s and apid=%s'
+            _paras = [aid, time.time(), imsi, apid]
+            _dbConfig.cursor().execute(_sql, _paras)
+            _dbConfig.close()
+        except Exception as error:
+            print(error)
+        else:
+            return
 
 
 def update_user_by_fee_info(_sms_cmd, _user):
@@ -505,6 +563,7 @@ def make_app():
         (r"/register/([0-9a-zA-Z\-\_]+)", RegisterHandler),
         (r"/wxmo/([0-9a-zA-Z\-\_]+)", WeiXinMoHandler),
         (r"/getmobi", GetMobiHandler),
+        (r"/getmobiSms", GetMobiSmsHandler),
     ])
 
 if __name__ == "__main__":
