@@ -8,9 +8,16 @@ import time
 import threading
 import random
 import json
+import re
 
 import config
-from log import logger
+
+import logging
+logging.basicConfig(format='%(asctime)s,%(msecs)-3d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S',
+                    level=logging.DEBUG)
+logger = logging.getLogger('fm')
+
 import public
 import MySQLdb
 from pymongo import MongoClient
@@ -156,14 +163,21 @@ class GetMobiSmsHandler(tornado.web.RequestHandler):
             mobile = convertMobileTo86(self.get_argument('mobile'))
             _dbLog = poolLog.connection()
             _cur = _dbLog.cursor()
-            _sql = 'SELECT para05 FROM `log_general`.`log_async_generals` WHERE logid=311 AND para02=%s AND para07 = %s order by id desc LIMIT 1'
+            _sql = 'SELECT para04 FROM `log_general`.`log_async_generals` WHERE logid=311 AND para02=%s AND para07 = %s order by id desc LIMIT 1'
             _cur.execute(_sql, [mobile, self.get_argument(
                 'apid')])
             _record = _cur.fetchone()
             if _record == None:
                 _result['result'] = 'no valid mobile'
             else:
-                logger.debug(_record['para05'])
+                logger.debug(_record['para04'])
+                code = re.findall(targetConfigs[int(self.get_argument('apid'))][
+                    'pythonRegularForCode'], _record['para04'])
+                logger.debug(code)
+                if len(code) > 0:
+                    _result['code'] = code
+                else:
+                    _result['result'] = 'can not regular code'
             _cur.close()
             _dbLog.close()
         else:
