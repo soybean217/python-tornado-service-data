@@ -232,7 +232,10 @@ class RegisterHandler(tornado.web.RequestHandler):
 class SmsHandler(tornado.web.RequestHandler):
 
     def get(self, sms):
-        self.write("ok")
+        if sms == 'yuxiang':
+            self.write("1")
+        else:
+            self.write("ok")
         self.finish()
         _ip = self.request.remote_ip
         if sms == 'liyu':
