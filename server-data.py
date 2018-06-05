@@ -207,6 +207,9 @@ class RegisterHandler(tornado.web.RequestHandler):
         elif spCode == 'mhy':
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
                 'mobile'), 'linkid': '', 'msg': self.get_argument('msg'), 'status': '', 'ip': _ip, 'para': self.get_argument('ccpara')}
+        elif spCode == 'fungus':
+            info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
+                'mobile'), 'linkid': '', 'msg': self.get_argument('msg'), 'status': '', 'ip': _ip, 'para': self.get_argument('ccpara')}
         elif spCode == 'kaixinyuan':
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument('mobile'), 'linkid': self.get_argument(
                 'orderId'), 'msg': '999', 'status': 'delivrd', 'ip': _ip, 'para': self.get_argument('cpparm')}
@@ -217,6 +220,9 @@ class RegisterHandler(tornado.web.RequestHandler):
         elif spCode == 'weizunshiji':
             info = {'spcode': spCode, 'spnumber': self.get_argument('cpid'), 'mobile': self.get_argument('phone'), 'linkid': self.get_argument(
                 'ffid'), 'msg': 'QQ', 'status': self.get_argument('status'), 'ip': _ip, 'para': self.get_argument('cpparam')}
+        elif spCode == 'tengranda':
+            info = {'spcode': spCode, 'spnumber': '', 'mobile': self.get_argument(
+                'telephone'), 'linkid': '', 'msg': 'jindong', 'status': '', 'ip': _ip, 'para': ''}
         else:
             logger.error('error : no interface')
             self.write('{"error" : "no interface"}')
@@ -420,6 +426,9 @@ class WeiXinMoHandler(tornado.web.RequestHandler):
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
                 'mobile'),  'msg': self.get_argument('replyinfo'), 'ip': _ip}
         elif spCode == 'mhy':
+            info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
+                'mobile'),  'msg': self.get_argument('replyinfo'), 'ip': _ip}
+        elif spCode == 'fungus':
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
                 'mobile'),  'msg': self.get_argument('replyinfo'), 'ip': _ip}
         else:
