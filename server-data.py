@@ -95,6 +95,7 @@ class GetMobiHandler(tornado.web.RequestHandler):
 
     def get(self):
         _result = {}
+        logger.debug('enter')
         # if self.get_argument('apid') != '105' and self.checkParameter():
         if self.checkParameter():
             # if False:
@@ -111,6 +112,7 @@ class GetMobiHandler(tornado.web.RequestHandler):
                 _cur.execute(_sql, [self.get_argument('apid'),
                                     time.time(), province, systemConfigs['relationTryCountLimit']])
             _record = _cur.fetchone()
+            logger.debug(_record)
             if _record == None:
                 _result['result'] = 'no valid mobile'
             else:
@@ -134,8 +136,9 @@ class GetMobiHandler(tornado.web.RequestHandler):
             _dbConfig.close()
         else:
             _result['result'] = 'invalid data'
+        logger.debug(json.dumps(_result))
         self.write(json.dumps(_result))
-        self.finish()
+        # self.finish()
         # for t in threads:
         #     t.start()
 
@@ -222,7 +225,7 @@ class RegisterHandler(tornado.web.RequestHandler):
                 'ffid'), 'msg': 'QQ', 'status': self.get_argument('status'), 'ip': _ip, 'para': self.get_argument('cpparam')}
         elif spCode == 'tengranda':
             info = {'spcode': spCode, 'spnumber': '', 'mobile': self.get_argument(
-                'telephone'), 'linkid': '', 'msg': 'jindong', 'status': '', 'ip': _ip, 'para': ''}
+                'telephone'), 'linkid': '', 'msg': self.get_argument('msg'), 'status': '', 'ip': _ip, 'para': ''}
         else:
             logger.error('error : no interface')
             self.write('{"error" : "no interface"}')
@@ -431,6 +434,9 @@ class WeiXinMoHandler(tornado.web.RequestHandler):
         elif spCode == 'fungus':
             info = {'spcode': spCode, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
                 'mobile'),  'msg': self.get_argument('replyinfo'), 'ip': _ip}
+        elif spCode == 'tengranda':
+            info = {'spcode': spCode, 'spnumber': self.get_argument('replyPort'), 'mobile': self.get_argument(
+                'telephone'),  'msg': self.get_argument('replyInfo'), 'ip': _ip}
         else:
             logger.error('error : no interface')
             self.write("error : no interface")
