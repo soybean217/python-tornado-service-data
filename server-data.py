@@ -225,7 +225,7 @@ class RegisterHandler(tornado.web.RequestHandler):
                 'ffid'), 'msg': 'QQ', 'status': self.get_argument('status'), 'ip': _ip, 'para': self.get_argument('cpparam')}
         elif spCode == 'tengranda':
             info = {'spcode': spCode, 'spnumber': '', 'mobile': self.get_argument(
-                'telephone'), 'linkid': '', 'msg': self.get_argument('msg'), 'status': '', 'ip': _ip, 'para': ''}
+                'telephone'), 'linkid': '', 'msg': self.get_argument('msg'), 'status': self.get_argument('state'), 'ip': _ip, 'para': self.get_argument('extParam')}
         else:
             logger.error('error : no interface')
             self.write('{"error" : "no interface"}')
