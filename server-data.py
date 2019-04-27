@@ -95,7 +95,6 @@ class GetMobiHandler(tornado.web.RequestHandler):
 
     def get(self):
         _result = {}
-        logger.debug('enter')
         # if self.get_argument('apid') != '105' and self.checkParameter():
         if self.checkParameter():
             # if False:
@@ -197,6 +196,24 @@ class GetMobiSmsHandler(tornado.web.RequestHandler):
         return result
 
 
+class BlockMobiTargetHandler(tornado.web.RequestHandler):
+
+    def get(self):
+        _result = {}
+        threads = []
+        # if self.get_argument('apid') != '105' and self.checkParameter():
+
+        _g_updateRelation = block_relation(
+            self.get_argument('mobile'), self.get_argument('apid'), '')
+        _g_updateRelation.start()
+
+        _result['result'] = 'received'
+        self.write(json.dumps(_result))
+        self.finish()
+        # for t in threads:
+        #     t.start()
+
+
 class RegisterHandler(tornado.web.RequestHandler):
 
     def get(self, spCode):
@@ -270,10 +287,12 @@ class SmsHandler(tornado.web.RequestHandler):
         elif sms == 'ximile':
             _sms_info = {'spcode': sms, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
                 'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('msg'), 'status': self.get_argument('status'), 'ip': _ip, 'feetime': '',  'query': str(self.request.query_arguments)}
-        # 西米乐
         elif sms == 'souyou':
             _sms_info = {'spcode': sms, 'spnumber': self.get_argument('to'), 'mobile': self.get_argument(
                 'from'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('msg'), 'status': self.get_argument('msgtype'), 'ip': _ip, 'feetime': '',  'query': str(self.request.query_arguments)}
+        elif sms == 'tengranda':
+            _sms_info = {'spcode': sms, 'spnumber': self.get_argument('spnumber'), 'mobile': self.get_argument(
+                'mobile'), 'linkid': self.get_argument('linkid'), 'msg': self.get_argument('msg'), 'status': self.get_argument('status'), 'ip': _ip, 'feetime': '',  'query': str(self.request.query_arguments)}
         else:
             logger.info('error : no interface')
             return
@@ -514,6 +533,7 @@ class update_relation(Greenlet):
 
     def proc(self,  imsi, apid, aid):
         try:
+            logger.debug('enter')
             _dbConfig = poolConfig.connection()
             _sql = 'update register_user_relations set registerChannelId = %s ,  fetchTime = %s , tryCount=tryCount+1 where `imsi`=%s and apid=%s'
             _paras = [aid, time.time(), imsi, apid]
@@ -525,10 +545,35 @@ class update_relation(Greenlet):
             return
 
 
+class block_relation(Greenlet):
+
+    def __init__(self, mobile, apid, aid):
+        # super(greenlet, self).__init__()
+        Greenlet.__init__(self)
+        self.mobile = mobile
+        self.apid = apid
+        self.aid = aid
+
+    def run(self):
+        self.proc(self.mobile, self.apid, self.apid)
+
+    def proc(self,  mobile, apid, aid):
+        try:
+            _dbConfig = poolConfig.connection()
+            _sql = 'update register_user_relations set successCount = 1 ,  lastSendTime = %s , tryCount=100 where `imsi` in (select imsi from imsi_users where mobile=%s or mobile=%s) and apid=%s'
+            _paras = [time.time(), mobile, '86' + mobile, apid]
+            _dbConfig.cursor().execute(_sql, _paras)
+            _dbConfig.close()
+        except Exception as error:
+            print(error)
+        else:
+            return
+
+
 def update_user_by_fee_info(_sms_cmd, _user):
     _time_current = time.time()
     if public.is_same_month(_time_current, _user['lastFeeTime']):
-        _sql = 'update imsi_users set lastFeeTime = %s , feeSum = ifnull(feeSum,0)  + %s , feeSumMonth = ifnull(feeSumMonth,0) + %s where imsi = %s '
+        _sql = 'update imsi_users set lastFeeTime = %s , feeSum = ifnull(feeSum,0) + %s , feeSumMonth = ifnull(feeSumMonth,0) + %s where imsi = %s '
     else:
         _sql = 'update imsi_users set lastFeeTime = %s , feeSum = ifnull(feeSum,0) + %s , feeSumMonth = %s where imsi = %s '
     dbConfig = poolConfig.connection()
@@ -613,6 +658,7 @@ def make_app():
         (r"/wxmo/([0-9a-zA-Z\-\_]+)", WeiXinMoHandler),
         (r"/getmobi", GetMobiHandler),
         (r"/getmobiSms", GetMobiSmsHandler),
+        (r"/blockMobiTarget", BlockMobiTargetHandler),
     ])
 
 if __name__ == "__main__":
