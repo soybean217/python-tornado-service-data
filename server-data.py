@@ -203,9 +203,9 @@ class BlockMobiTargetHandler(tornado.web.RequestHandler):
         threads = []
         # if self.get_argument('apid') != '105' and self.checkParameter():
 
-        _g_updateRelation = block_relation(
+        _g_blockRelation = block_relation(
             self.get_argument('mobile'), self.get_argument('apid'), '')
-        _g_updateRelation.start()
+        _g_blockRelation.start()
 
         _result['result'] = 'received'
         self.write(json.dumps(_result))
@@ -533,7 +533,6 @@ class update_relation(Greenlet):
 
     def proc(self,  imsi, apid, aid):
         try:
-            logger.debug('enter')
             _dbConfig = poolConfig.connection()
             _sql = 'update register_user_relations set registerChannelId = %s ,  fetchTime = %s , tryCount=tryCount+1 where `imsi`=%s and apid=%s'
             _paras = [aid, time.time(), imsi, apid]
